@@ -1,0 +1,432 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:device_preview/device_preview.dart';
+import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized(); // เพิ่มเพื่อให้ async ทำงานถูกต้อง
+  await Hive.initFlutter();
+  await Hive.openBox('attendanceBox');
+  await Hive.openBox('summaryBox');
+
+  runApp(
+    DevicePreview(
+      enabled: true,
+      builder: (context) => const MyApp(), // แก้ builder ให้ถูกต้อง
+    ),
+  );
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      locale: DevicePreview.locale(context), // รองรับ locale preview
+      builder: DevicePreview.appBuilder, // รองรับ preview builder
+      home: const AttendanceScreen(),
+    );
+  }
+}
+
+class Student {
+  final int number;
+  final String name;
+  final String gender;
+
+  Student({required this.number, required this.name, required this.gender});
+}
+
+class AttendanceScreen extends StatefulWidget {
+  const AttendanceScreen({super.key});
+
+  @override
+  // ignore: library_private_types_in_public_api
+  _AttendanceScreenState createState() => _AttendanceScreenState();
+}
+
+class _AttendanceScreenState extends State<AttendanceScreen> {
+  late Box attendanceBox;
+  final String currentDate = DateTime.now().toIso8601String().split('T')[0];
+
+  // เพิ่มข้อมูลนักเรียน
+  final List<Student> students = [
+    Student(number: 1, name: 'เด็กชายธวัชชัย ดวงก้อม', gender: 'ชาย'),
+    Student(number: 2, name: 'เด็กชายธนประเสริฐ โคตวัน', gender: 'ชาย'),
+    Student(number: 3, name: 'เด็กหญิงมนัสนันท์ คำภาพันธ์', gender: 'หญิง'),
+    Student(number: 4, name: 'เด็กหญิงพรภิมล พันธุ์ไพโรจน์', gender: 'หญิง'),
+    Student(number: 5, name: 'เด็กชายนพฤทธิ์ ศรีสวัสดิ์', gender: 'ชาย'),
+    Student(number: 6, name: 'เด็กหญิงชนาพร หมวกทอง', gender: 'หญิง'),
+    Student(number: 7, name: 'เด็กหญิงโชติกา ฉัตรสุวรรณ์', gender: 'หญิง'),
+    Student(number: 8, name: 'เด็กหญิงกานต์มณี บุญทนาวงษ์', gender: 'หญิง'),
+    Student(number: 9, name: 'เด็กหญิงภัทรวดี วิลาวรรณ์', gender: 'หญิง'),
+    Student(number: 10, name: 'เด็กหญิงชโลธร เกษมจิตร', gender: 'หญิง'),
+    Student(number: 11, name: 'เด็กหญิงภัททิรา ชำนาญปืน', gender: 'หญิง'),
+    Student(number: 12, name: 'เด็กชายณัฐวุฒิ วรสุริยะรัตน์', gender: 'ชาย'),
+    Student(number: 13, name: 'เด็กหญิงกัญญาภัด ขอดแก้ว', gender: 'หญิง'),
+    Student(number: 14, name: 'เด็กหญิงศศินา บัวทอง', gender: 'หญิง'),
+    Student(number: 15, name: 'เด็กหญิงภัทราพร ทัดเทียม', gender: 'หญิง'),
+    Student(number: 16, name: 'เด็กชายนนทกร สนองพงษ์', gender: 'ชาย'),
+    Student(number: 17, name: 'เด็กชายอนุชา หารวิชัย', gender: 'ชาย'),
+    Student(number: 18, name: 'เด็กหญิงญานิศา มาลัย', gender: 'หญิง'),
+    Student(number: 19, name: 'เด็กหญิงช่อผกา ยอดโยม', gender: 'หญิง'),
+    Student(number: 20, name: 'เด็กหญิงณิชานันท์ ดวงจันแดง', gender: 'หญิง'),
+    Student(number: 21, name: 'เด็กหญิงกัญญาพัชร์ คุตะโค', gender: 'หญิง'),
+    Student(number: 22, name: 'เด็กหญิงชนม์พิชา อำนวย', gender: 'หญิง'),
+    Student(number: 23, name: 'เด็กชายพงศกร เหล็กน้ำคบ', gender: 'ชาย'),
+    Student(number: 24, name: 'เด็กหญิงปวันรัตน์ จันแจ้ง', gender: 'หญิง'),
+    Student(number: 25, name: 'เด็กหญิงภัทรลภา เจริญมรรค', gender: 'หญิง'),
+    Student(number: 26, name: 'เด็กหญิงณพัชญา ขลังวิชา', gender: 'หญิง'),
+    Student(number: 27, name: 'เด็กชายณัฐเดช ไขแสง', gender: 'ชาย'),
+    Student(number: 28, name: 'เด็กชายปกรณ์ สินธุเสน', gender: 'ชาย'),
+    Student(number: 29, name: 'เด็กหญิงกัลยา สาแก้ว', gender: 'หญิง'),
+    Student(number: 30, name: 'เด็กชายวิททสุ แก้วปักษา', gender: 'ชาย'),
+    Student(number: 31, name: 'เด็กชายสุทิวัส ศรีสุพงษ์', gender: 'ชาย'),
+    Student(number: 32, name: 'เด็กหญิงกวินธิดา ดัดสมัย', gender: 'หญิง'),
+    Student(number: 33, name: 'เด็กหญิงสุธิดา โคตะมา', gender: 'หญิง'),
+    Student(number: 34, name: 'เด็กหญิงจุฑาทิพย์ สว่างวงษ์', gender: 'หญิง'),
+    Student(number: 35, name: 'เด็กชายศรัณยู บังจันทร์', gender: 'ชาย'),
+    Student(number: 36, name: 'เด็กหญิงพลอยประดับ ตาเปาร์', gender: 'หญิง'),
+    Student(number: 37, name: 'เด็กหญิงสุธาสินี โสดาลุ', gender: 'หญิง'),
+    Student(number: 38, name: 'เด็กหญิงณัฐธิดา แสนยศ', gender: 'หญิง'),
+    Student(number: 39, name: 'เด็กหญิงนันท์ธิดา ศิริแวว', gender: 'หญิง'),
+    Student(number: 40, name: 'เด็กชายธนกร ตุธรรม', gender: 'ชาย'),
+    Student(number: 41, name: 'เด็กหญิงกนกวลัย ปราพาล', gender: 'หญิง'),
+    // เพิ่มข้อมูลนักเรียนเพิ่มเติมตามต้องการ
+  ];
+    void updateSummaryBox() {
+    Box summaryBox = Hive.box('summaryBox');
+    Map<String, dynamic> attendance = Map<String, dynamic>.from(attendanceBox.get(currentDate, defaultValue: {}));
+
+    int malePresentCount = 0;
+    int femalePresentCount = 0;
+
+    attendance.forEach((key, value) {
+      if (value['status'] == 'มาเรียน') {
+        if (value['gender'] == 'ชาย') {
+          malePresentCount++;
+        } else if (value['gender'] == 'หญิง') {
+          femalePresentCount++;
+        }
+      }
+    });
+
+    summaryBox.put(
+      currentDate,
+      {
+        'malePresent': malePresentCount,
+        'femalePresent': femalePresentCount,
+        'totalPresent': malePresentCount + femalePresentCount,
+      },
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    attendanceBox = Hive.box('attendanceBox');
+
+    Map<String, dynamic>? existingAttendance = attendanceBox.get(currentDate);
+    if (existingAttendance == null || existingAttendance.keys.length != students.length) {
+      // สร้างข้อมูลเริ่มต้นหรือรีเซ็ตข้อมูลให้ตรงกับนักเรียนทั้งหมด
+      Map<String, Map<String, String>> initialData = {
+        for (var student in students)
+          student.number.toString(): {
+            'name': student.name,
+            'gender': student.gender,
+            'status': 'ขาดเรียน', // ค่าเริ่มต้นเป็น "ขาดเรียน"
+          },
+      };
+      attendanceBox.put(currentDate, initialData);
+    }
+  }
+
+
+@override
+  Widget build(BuildContext context) {
+    Map<String, dynamic> attendance = Map.from(
+      attendanceBox.get(currentDate, defaultValue: {
+        for (var student in students)
+          student.number.toString(): {
+            'name': student.name,
+            'gender': student.gender,
+            'status': 'ขาดเรียน', // ค่าเริ่มต้น
+          },
+      }),
+    );
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('เช็คชื่อ ($currentDate)'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AttendanceHistoryScreen(students: []),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      body: GridView.builder(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 5),
+        itemCount: students.length,
+        itemBuilder: (context, index) {
+          Student student = students[index];
+          String studentStatus = attendance[student.number.toString()]['status'];
+
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                attendance[student.number.toString()]['status'] =
+                    studentStatus == 'มาเรียน' ? 'ขาดเรียน' : 'มาเรียน';
+                attendanceBox.put(currentDate, attendance);
+                updateSummaryBox(); // อัปเดตข้อมูลใน summaryBox
+              });
+            },
+            child: Container(
+              margin: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: studentStatus == 'มาเรียน' ? Colors.green : Colors.red,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Center(
+                child: Text(
+                  '${student.number}',
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class AttendanceHistoryScreen extends StatelessWidget {
+  final List<Student> students;
+  const AttendanceHistoryScreen({super.key, required this.students});
+
+  @override
+  Widget build(BuildContext context) {
+    Box attendanceBox = Hive.box('attendanceBox');
+    for (var key in attendanceBox.keys) {
+      if (kDebugMode) {
+        print('Key: $key, Value: ${attendanceBox.get(key)}');
+      }
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('ประวัติการขาดเรียน')),
+      body: ListView(
+        children: attendanceBox.keys.map((key) {
+          Map<String, dynamic> attendance = Map<String, dynamic>.from(attendanceBox.get(key, defaultValue: {}));
+
+          // แยกนักเรียนชายและหญิงที่ขาดเรียน
+          int maleAbsentCount = 0;
+          int femaleAbsentCount = 0;
+          attendance.forEach((key, value) {
+            if (value['status'] == 'ขาดเรียน') {
+              if (value['gender'] == 'ชาย') {
+                maleAbsentCount++;
+              } else if (value['gender'] == 'หญิง') {
+                femaleAbsentCount++;
+              }
+            }
+          });
+
+          // แปลงวันที่ให้อยู่ในรูปแบบ วัน d/MM/yyyy
+          String formattedDate = '';
+          try {
+            final parsedDate = DateTime.parse(key); // แปลง key เป็น DateTime
+            formattedDate = DateFormat('EEEE d/MM/yyyy', 'th').format(parsedDate); // ปรับรูปแบบวันที่เป็นภาษาไทย
+          } catch (e) {
+            formattedDate = key; // ใช้ key เดิมถ้าเกิดปัญหา
+          }
+          
+          return ListTile(
+            title: Text(formattedDate), // ใช้วันที่ที่ฟอร์แมตแล้ว
+            subtitle: Text(
+              'ขาดเรียน: ${maleAbsentCount + femaleAbsentCount} คน (ชายขาด: $maleAbsentCount คน, หญิงขาด: $femaleAbsentCount คน)',
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AttendanceSummaryScreen(
+                    date: key, summaryText: '',
+                  ),
+                ),
+              );
+            },
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class AttendanceDetailScreen extends StatelessWidget {
+  final String date;
+  AttendanceDetailScreen({super.key, required this.date, required List<Student> students});
+  final List<Student> students = [
+    Student(number: 1, name: 'เด็กชายธวัชชัย ดวงก้อม', gender: 'ชาย'),
+    Student(number: 2, name: 'เด็กชายธนประเสริฐ โคตวัน', gender: 'ชาย'),
+    Student(number: 3, name: 'เด็กหญิงมนัสนันท์ คำภาพันธ์', gender: 'หญิง'),
+    Student(number: 4, name: 'เด็กหญิงพรภิมล พันธุ์ไพโรจน์', gender: 'หญิง'),
+    Student(number: 5, name: 'เด็กชายนพฤทธิ์ ศรีสวัสดิ์', gender: 'ชาย'),
+    Student(number: 6, name: 'เด็กหญิงชนาพร หมวกทอง', gender: 'หญิง'),
+    Student(number: 7, name: 'เด็กหญิงโชติกา ฉัตรสุวรรณ์', gender: 'หญิง'),
+    Student(number: 8, name: 'เด็กหญิงกานต์มณี บุญทนาวงษ์', gender: 'หญิง'),
+    Student(number: 9, name: 'เด็กหญิงภัทรวดี วิลาวรรณ์', gender: 'หญิง'),
+    Student(number: 10, name: 'เด็กหญิงชโลธร เกษมจิตร', gender: 'หญิง'),
+    Student(number: 11, name: 'เด็กหญิงภัททิรา ชำนาญปืน', gender: 'หญิง'),
+    Student(number: 12, name: 'เด็กชายณัฐวุฒิ วรสุริยะรัตน์', gender: 'ชาย'),
+    Student(number: 13, name: 'เด็กหญิงกัญญาภัด ขอดแก้ว', gender: 'หญิง'),
+    Student(number: 14, name: 'เด็กหญิงศศินา บัวทอง', gender: 'หญิง'),
+    Student(number: 15, name: 'เด็กหญิงภัทราพร ทัดเทียม', gender: 'หญิง'),
+    Student(number: 16, name: 'เด็กชายนนทกร สนองพงษ์', gender: 'ชาย'),
+    Student(number: 17, name: 'เด็กชายอนุชา หารวิชัย', gender: 'ชาย'),
+    Student(number: 18, name: 'เด็กหญิงญานิศา มาลัย', gender: 'หญิง'),
+    Student(number: 19, name: 'เด็กหญิงช่อผกา ยอดโยม', gender: 'หญิง'),
+    Student(number: 20, name: 'เด็กหญิงณิชานันท์ ดวงจันแดง', gender: 'หญิง'),
+    Student(number: 21, name: 'เด็กหญิงกัญญาพัชร์ คุตะโค', gender: 'หญิง'),
+    Student(number: 22, name: 'เด็กหญิงชนม์พิชา อำนวย', gender: 'หญิง'),
+    Student(number: 23, name: 'เด็กชายพงศกร เหล็กน้ำคบ', gender: 'ชาย'),
+    Student(number: 24, name: 'เด็กหญิงปวันรัตน์ จันแจ้ง', gender: 'หญิง'),
+    Student(number: 25, name: 'เด็กหญิงภัทรลภา เจริญมรรค', gender: 'หญิง'),
+    Student(number: 26, name: 'เด็กหญิงณพัชญา ขลังวิชา', gender: 'หญิง'),
+    Student(number: 27, name: 'เด็กชายณัฐเดช ไขแสง', gender: 'ชาย'),
+    Student(number: 28, name: 'เด็กชายปกรณ์ สินธุเสน', gender: 'ชาย'),
+    Student(number: 29, name: 'เด็กหญิงกัลยา สาแก้ว', gender: 'หญิง'),
+    Student(number: 30, name: 'เด็กชายวิททสุ แก้วปักษา', gender: 'ชาย'),
+    Student(number: 31, name: 'เด็กชายสุทิวัส ศรีสุพงษ์', gender: 'ชาย'),
+    Student(number: 32, name: 'เด็กหญิงกวินธิดา ดัดสมัย', gender: 'หญิง'),
+    Student(number: 33, name: 'เด็กหญิงสุธิดา โคตะมา', gender: 'หญิง'),
+    Student(number: 34, name: 'เด็กหญิงจุฑาทิพย์ สว่างวงษ์', gender: 'หญิง'),
+    Student(number: 35, name: 'เด็กชายศรัณยู บังจันทร์', gender: 'ชาย'),
+    Student(number: 36, name: 'เด็กหญิงพลอยประดับ ตาเปาร์', gender: 'หญิง'),
+    Student(number: 37, name: 'เด็กหญิงสุธาสินี โสดาลุ', gender: 'หญิง'),
+    Student(number: 38, name: 'เด็กหญิงณัฐธิดา แสนยศ', gender: 'หญิง'),
+    Student(number: 39, name: 'เด็กหญิงนันท์ธิดา ศิริแวว', gender: 'หญิง'),
+    Student(number: 40, name: 'เด็กชายธนกร ตุธรรม', gender: 'ชาย'),
+    Student(number: 41, name: 'เด็กหญิงกนกวลัย ปราพาล', gender: 'หญิง'),
+    // เพิ่มข้อมูลนักเรียนเพิ่มเติมตามต้องการ
+  ];
+  @override
+  Widget build(BuildContext context) {
+    Box attendanceBox = Hive.box('attendanceBox');
+
+    // ดึงข้อมูลของวันที่และแปลงให้เป็น Map
+    Map<String, dynamic> attendance = Map<String, dynamic>.from(attendanceBox.get(date, defaultValue: {}));
+
+    return Scaffold(
+      appBar: AppBar(title: Text('รายละเอียดวันที่ $date')),
+      body: ListView.builder(
+        itemCount: students.length,
+        itemBuilder: (context, index) {
+          Student student = students[index];
+          String status = attendance[student.number.toString()]?['status'] ?? 'ขาดเรียน';
+
+          return ListTile(
+            title: Text('เลขที่ ${student.number}: ${student.name}'),
+            trailing: Icon(
+              status == 'มาเรียน' ? Icons.check_circle : Icons.cancel,
+              color: status == 'มาเรียน' ? Colors.green : Colors.red,
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+class AttendanceSummaryScreen extends StatelessWidget {
+  final String date;
+  final String summaryText;
+  const AttendanceSummaryScreen({super.key, required this.date, required this.summaryText});
+
+  @override
+  Widget build(BuildContext context) {
+    Box attendanceBox = Hive.box('attendanceBox');
+    Map<String, dynamic> attendance = Map<String, dynamic>.from(
+      attendanceBox.get(date, defaultValue: {}),
+    );
+
+    // แยกข้อมูลนักเรียนชายและหญิง
+    int maleCount = 0, femaleCount = 0;
+    int malePresent = 0, maleAbsent = 0;
+    int femalePresent = 0, femaleAbsent = 0;
+
+    attendance.forEach((key, value) {
+      if (value['gender'] == 'ชาย') {
+        maleCount++;
+        if (value['status'] == 'มาเรียน') {
+          malePresent++;
+        } else {
+          maleAbsent++;
+        }
+      } else if (value['gender'] == 'หญิง') {
+        femaleCount++;
+        if (value['status'] == 'มาเรียน') {
+          femalePresent++;
+        } else {
+          femaleAbsent++;
+        }
+      }
+    });
+
+    // คำนวณจำนวนรวมและเปอร์เซ็นต์
+    int totalStudents = maleCount + femaleCount;
+    int totalPresent = malePresent + femalePresent;
+    double attendanceRate = totalPresent / totalStudents * 100;
+
+    // แปลงวันที่
+    String formattedDate = DateFormat('EEEE d/MM/yyyy', 'th').format(DateTime.parse(date));
+
+    // สร้างข้อความสรุป
+    String summary =
+        'ป.6/3 = $totalStudents คน\nชาย = $maleCount คน มา $malePresent คน ขาด $maleAbsent คน \nหญิง = $femaleCount คน มา $femalePresent คน ขาด $femaleAbsent คน \nรวมทั้งหมด: $totalStudents คน \nรวมมา: $totalPresent คน\nร้อยละ: ${attendanceRate.toStringAsFixed(2)}%';
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(' $formattedDate'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Divider(),
+            Text(summary, style: const TextStyle(fontSize: 16)),
+            const Divider(),
+            // ปุ่มคัดลอก
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('ข้อความสรุป:', style: TextStyle(fontSize: 16)),
+                IconButton(
+                  icon: const Icon(Icons.copy),
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: summary)).then((_) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('คัดลอกข้อความแล้ว')),
+                      );
+                    });
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

@@ -1,0 +1,50 @@
+class Student {
+  final int number;
+  final String name;
+  final String gender;
+
+  Student({required this.number, required this.name, required this.gender});
+}
+final List<Student> studentList = [
+    Student(number: 1, name: 'เด็กชายธวัชชัย ดวงก้อม', gender: 'ชาย'),
+    Student(number: 2, name: 'เด็กชายธนประเสริฐ โคตวัน', gender: 'ชาย'),
+    Student(number: 3, name: 'เด็กหญิงมนัสนันท์ คำภาพันธ์', gender: 'หญิง'),
+    Student(number: 4, name: 'เด็กหญิงพรภิมล พันธุ์ไพโรจน์', gender: 'หญิง'),
+    Student(number: 5, name: 'เด็กชายนพฤทธิ์ ศรีสวัสดิ์', gender: 'ชาย'),
+    Student(number: 6, name: 'เด็กหญิงชนาพร หมวกทอง', gender: 'หญิง'),
+    Student(number: 7, name: 'เด็กหญิงโชติกา ฉัตรสุวรรณ์', gender: 'หญิง'),
+    Student(number: 8, name: 'เด็กหญิงกานต์มณี บุญทนาวงษ์', gender: 'หญิง'),
+    Student(number: 9, name: 'เด็กหญิงภัทรวดี วิลาวรรณ์', gender: 'หญิง'),
+    Student(number: 10, name: 'เด็กหญิงชโลธร เกษมจิตร', gender: 'หญิง'),
+    Student(number: 11, name: 'เด็กหญิงภัททิรา ชำนาญปืน', gender: 'หญิง'),
+    Student(number: 12, name: 'เด็กชายณัฐวุฒิ วรสุริยะรัตน์', gender: 'ชาย'),
+    Student(number: 13, name: 'เด็กหญิงกัญญาภัด ขอดแก้ว', gender: 'หญิง'),
+    Student(number: 14, name: 'เด็กหญิงศศินา บัวทอง', gender: 'หญิง'),
+    Student(number: 15, name: 'เด็กหญิงภัทราพร ทัดเทียม', gender: 'หญิง'),
+    Student(number: 16, name: 'เด็กชายนนทกร สนองพงษ์', gender: 'ชาย'),
+    Student(number: 17, name: 'เด็กชายอนุชา หารวิชัย', gender: 'ชาย'),
+    Student(number: 18, name: 'เด็กหญิงญานิศา มาลัย', gender: 'หญิง'),
+    Student(number: 19, name: 'เด็กหญิงช่อผกา ยอดโยม', gender: 'หญิง'),
+    Student(number: 20, name: 'เด็กหญิงณิชานันท์ ดวงจันแดง', gender: 'หญิง'),
+    Student(number: 21, name: 'เด็กหญิงกัญญาพัชร์ คุตะโค', gender: 'หญิง'),
+    Student(number: 22, name: 'เด็กหญิงชนม์พิชา อำนวย', gender: 'หญิง'),
+    Student(number: 23, name: 'เด็กชายพงศกร เหล็กน้ำคบ', gender: 'ชาย'),
+    Student(number: 24, name: 'เด็กหญิงปวันรัตน์ จันแจ้ง', gender: 'หญิง'),
+    Student(number: 25, name: 'เด็กหญิงภัทรลภา เจริญมรรค', gender: 'หญิง'),
+    Student(number: 26, name: 'เด็กหญิงณพัชญา ขลังวิชา', gender: 'หญิง'),
+    Student(number: 27, name: 'เด็กชายณัฐเดช ไขแสง', gender: 'ชาย'),
+    Student(number: 28, name: 'เด็กชายปกรณ์ สินธุเสน', gender: 'ชาย'),
+    Student(number: 29, name: 'เด็กหญิงกัลยา สาแก้ว', gender: 'หญิง'),
+    Student(number: 30, name: 'เด็กชายวิททสุ แก้วปักษา', gender: 'ชาย'),
+    Student(number: 31, name: 'เด็กชายสุทิวัส ศรีสุพงษ์', gender: 'ชาย'),
+    Student(number: 32, name: 'เด็กหญิงกวินธิดา ดัดสมัย', gender: 'หญิง'),
+    Student(number: 33, name: 'เด็กหญิงสุธิดา โคตะมา', gender: 'หญิง'),
+    Student(number: 34, name: 'เด็กหญิงจุฑาทิพย์ สว่างวงษ์', gender: 'หญิง'),
+    Student(number: 35, name: 'เด็กชายศรัณยู บังจันทร์', gender: 'ชาย'),
+    Student(number: 36, name: 'เด็กหญิงพลอยประดับ ตาเปาร์', gender: 'หญิง'),
+    Student(number: 37, name: 'เด็กหญิงสุธาสินี โสดาลุ', gender: 'หญิง'),
+    Student(number: 38, name: 'เด็กหญิงณัฐธิดา แสนยศ', gender: 'หญิง'),
+    Student(number: 39, name: 'เด็กหญิงนันท์ธิดา ศิริแวว', gender: 'หญิง'),
+    Student(number: 40, name: 'เด็กชายธนกร ตุธรรม', gender: 'ชาย'),
+    Student(number: 41, name: 'เด็กหญิงกนกวลัย ปราพาล', gender: 'หญิง'),
+];
