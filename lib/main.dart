@@ -1,16 +1,31 @@
+import 'package:device_preview/device_preview.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:device_preview/device_preview.dart';
-import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
+// ignore: depend_on_referenced_packages
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:intl/intl.dart';
+import 'screens/attendance_screen.dart';
 import 'student_list.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // เพิ่มเพื่อให้ async ทำงานถูกต้อง
   await Hive.initFlutter();
-  await Hive.openBox('attendanceBox');
-  await Hive.openBox('summaryBox');
+  try {
+    await Hive.openBox('attendanceBox');
+    await Hive.openBox('summaryBox');
+  } catch (e) {
+    if (kDebugMode) {
+      print('เปิด Hive Box ไม่สำเร็จ: $e');
+    }
+  }
+  if (kDebugMode) {
+    print('เปิด attendanceBox: ${Hive.isBoxOpen('attendanceBox')}');
+  }
+  if (kDebugMode) {
+    print('เปิด summaryBox: ${Hive.isBoxOpen('summaryBox')}');
+  }
 
   runApp(
     DevicePreview(
@@ -25,213 +40,20 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      locale: DevicePreview.locale(context), // รองรับ locale preview
-      builder: DevicePreview.appBuilder, // รองรับ preview builder
-      home: const AttendanceScreen(),
-    );
-  }
-}
-
-class AttendanceScreen extends StatefulWidget {
-  const AttendanceScreen({super.key});
-
-  @override
-  // ignore: library_private_types_in_public_api
-  _AttendanceScreenState createState() => _AttendanceScreenState();
-}
-
-class _AttendanceScreenState extends State<AttendanceScreen> {
-  late Box attendanceBox;
-  final String currentDate = DateTime.now().toIso8601String().split('T')[0];
-  List<Student> students = studentList;
-
-    void updateSummaryBox() {
-    Box summaryBox = Hive.box('summaryBox');
-    Map<String, dynamic> attendance = Map<String, dynamic>.from(attendanceBox.get(currentDate, defaultValue: {}));
-
-    int malePresentCount = 0;
-    int femalePresentCount = 0;
-
-    attendance.forEach((key, value) {
-      if (value['status'] == 'มาเรียน') {
-        if (value['gender'] == 'ชาย') {
-          malePresentCount++;
-        } else if (value['gender'] == 'หญิง') {
-          femalePresentCount++;
-        }
-      }
-    });
-
-    summaryBox.put(
-      currentDate,
-      {
-        'malePresent': malePresentCount,
-        'femalePresent': femalePresentCount,
-        'totalPresent': malePresentCount + femalePresentCount,
-      },
-    );
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    attendanceBox = Hive.box('attendanceBox');
-
-    Map<String, dynamic>? existingAttendance = attendanceBox.get(currentDate);
-    if (existingAttendance == null || existingAttendance.keys.length != students.length) {
-      // สร้างข้อมูลเริ่มต้นหรือรีเซ็ตข้อมูลให้ตรงกับนักเรียนทั้งหมด
-      Map<String, Map<String, String>> initialData = {
-        for (var student in students)
-          student.number.toString(): {
-            'name': student.name,
-            'gender': student.gender,
-            'status': 'ขาดเรียน', // ค่าเริ่มต้นเป็น "ขาดเรียน"
-          },
-      };
-      attendanceBox.put(currentDate, initialData);
-    }
-  }
-
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder(
-      valueListenable: attendanceBox.listenable(),
-      builder: (context, Box box, _) {
-        Map<String, dynamic> attendance = Map.from(
-          box.get(currentDate, defaultValue: {
-            for (var student in students)
-              student.number.toString(): {
-                'name': student.name,
-                'gender': student.gender,
-                'status': 'ขาดเรียน', // ค่าเริ่มต้น
-              },
-          }),
-        );
-
-        return Scaffold(
-          appBar: AppBar(
-            title: Text('เช็คชื่อ ($currentDate)'),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.history),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AttendanceHistoryScreen(students: []),
-                    ),
-                  );
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.table_chart),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AttendanceTableScreen(),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-          body: GridView.builder(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 5),
-            itemCount: students.length,
-            itemBuilder: (context, index) {
-              Student student = students[index];
-              String studentStatus = attendance[student.number.toString()]['status'];
-
-              return GestureDetector(
-                onTap: () {
-                  attendance[student.number.toString()]['status'] =
-                      studentStatus == 'มาเรียน' ? 'ขาดเรียน' : 'มาเรียน';
-                  attendanceBox.put(currentDate, attendance);
-                  updateSummaryBox(); // อัปเดตข้อมูลใน summaryBox
-                },
-                child: Container(
-                  margin: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: studentStatus == 'มาเรียน' ? Colors.green : Colors.red,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: Text(
-                      '${student.number}',
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
-}
-
-class AttendanceHistoryScreen extends StatelessWidget {
-  final List<Student> students;
-  const AttendanceHistoryScreen({super.key, required this.students});
-
-  @override
-  Widget build(BuildContext context) {
-    Box attendanceBox = Hive.box('attendanceBox');
-    for (var key in attendanceBox.keys) {
-      if (kDebugMode) {
-        print('Key: $key, Value: ${attendanceBox.get(key)}');
-      }
-    }
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('ประวัติการขาดเรียน')),
-      body: ListView(
-        children: attendanceBox.keys.map((key) {
-          Map<String, dynamic> attendance = Map<String, dynamic>.from(attendanceBox.get(key, defaultValue: {}));
-
-          // แยกนักเรียนชายและหญิงที่ขาดเรียน
-          int maleAbsentCount = 0;
-          int femaleAbsentCount = 0;
-          attendance.forEach((key, value) {
-            if (value['status'] == 'ขาดเรียน') {
-              if (value['gender'] == 'ชาย') {
-                maleAbsentCount++;
-              } else if (value['gender'] == 'หญิง') {
-                femaleAbsentCount++;
-              }
-            }
-          });
-
-          // แปลงวันที่ให้อยู่ในรูปแบบ วัน d/MM/yyyy
-          String formattedDate = '';
-          try {
-            final parsedDate = DateTime.parse(key); // แปลง key เป็น DateTime
-            formattedDate = DateFormat('EEEE d/MM/yyyy', 'th').format(parsedDate); // ปรับรูปแบบวันที่เป็นภาษาไทย
-          } catch (e) {
-            formattedDate = key; // ใช้ key เดิมถ้าเกิดปัญหา
-          }
-
-          return ListTile(
-            title: Text(formattedDate), // ใช้วันที่ที่ฟอร์แมตแล้ว
-            subtitle: Text(
-              'ขาดเรียน: ${maleAbsentCount + femaleAbsentCount} คน (ชายขาด: $maleAbsentCount คน, หญิงขาด: $femaleAbsentCount คน)',
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AttendanceSummaryScreen(
-                    date: key, summaryText: '',
-                  ),
-                ),
-              );
-            },
-          );
-        }).toList(),
+    return const MaterialApp(
+      localizationsDelegates: [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: [
+        Locale('th', 'TH'), // เพิ่มภาษาไทย
+        Locale('en', 'US'), // ภาษาอังกฤษ (ตัวอย่าง)
+      ],
+      locale: Locale('th', 'TH'), // กำหนดค่าเริ่มต้นเป็นภาษาไทย
+      home: AttendanceScreen(
+        date: '2025-01-01', // ตัวอย่าง
+        summaryText: 'สรุปผลการเข้าชั้นเรียน',
       ),
     );
   }
@@ -240,14 +62,16 @@ class AttendanceHistoryScreen extends StatelessWidget {
 // ignore: must_be_immutable
 class AttendanceDetailScreen extends StatelessWidget {
   final String date;
-  AttendanceDetailScreen({super.key, required this.date, required List<Student> students});
+  AttendanceDetailScreen(
+      {super.key, required this.date, required List<Student> students});
   List<Student> students = studentList;
   @override
   Widget build(BuildContext context) {
     Box attendanceBox = Hive.box('attendanceBox');
 
     // ดึงข้อมูลของวันที่และแปลงให้เป็น Map
-    Map<String, dynamic> attendance = Map<String, dynamic>.from(attendanceBox.get(date, defaultValue: {}));
+    Map<String, dynamic> attendance =
+        Map<String, dynamic>.from(attendanceBox.get(date, defaultValue: {}));
 
     return Scaffold(
       appBar: AppBar(title: Text('รายละเอียดวันที่ $date')),
@@ -255,7 +79,8 @@ class AttendanceDetailScreen extends StatelessWidget {
         itemCount: students.length,
         itemBuilder: (context, index) {
           Student student = students[index];
-          String status = attendance[student.number.toString()]?['status'] ?? 'ขาดเรียน';
+          String status =
+              attendance[student.number.toString()]?['status'] ?? 'ขาดเรียน';
 
           return ListTile(
             title: Text('เลขที่ ${student.number}: ${student.name}'),
@@ -269,17 +94,29 @@ class AttendanceDetailScreen extends StatelessWidget {
     );
   }
 }
+
 class AttendanceSummaryScreen extends StatelessWidget {
   final String date;
   final String summaryText;
 
-  const AttendanceSummaryScreen({super.key, required this.date, required this.summaryText});
+  const AttendanceSummaryScreen(
+      {super.key, required this.date, required this.summaryText});
 
   @override
   Widget build(BuildContext context) {
-    Box attendanceBox = Hive.box('attendanceBox');
+    Hive.box('attendanceBox');
+    Box summaryBox = Hive.box('summaryBox');
+
+    if (summaryBox.isEmpty) {
+      // ตรวจสอบว่ากล่องข้อมูลว่างหรือไม่
+      return Scaffold(
+        appBar: AppBar(title: const Text('สรุปการเช็คชื่อ')),
+        body: const Center(
+            child: Text('ไม่มีข้อมูลสรุปการเช็คชื่อ')), // เพิ่มข้อความแจ้งเตือน
+      );
+    }
     Map<String, dynamic> attendance = Map<String, dynamic>.from(
-      attendanceBox.get(date, defaultValue: {}),
+      summaryBox.get(date, defaultValue: {'malePresent': 0, 'femalePresent': 0, 'totalPresent': 0}), // ใช้ค่าเริ่มต้น
     );
 
     // แยกข้อมูลนักเรียนชายและหญิง
@@ -319,7 +156,8 @@ class AttendanceSummaryScreen extends StatelessWidget {
     double attendanceRate = totalPresent / totalStudents * 100;
 
     // แปลงวันที่
-    String formattedDate = DateFormat('EEEE d/MM/yyyy', 'th').format(DateTime.parse(date));
+    String formattedDate =
+        DateFormat('EEEE d/MM/yyyy', 'th').format(DateTime.parse(date));
 
     // สร้างข้อความสรุป
     String summary =
@@ -359,7 +197,8 @@ class AttendanceSummaryScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => AttendanceDetailScreen(date: date, students: studentList),
+                    builder: (context) => AttendanceDetailScreen(
+                        date: date, students: studentList),
                   ),
                 );
               },
@@ -378,8 +217,10 @@ class AttendanceSummaryScreen extends StatelessWidget {
                       itemBuilder: (context, index) {
                         final student = absentStudents[index];
                         return ListTile(
-                          leading: const Icon(Icons.person_off, color: Colors.red),
-                          title: Text('เลขที่ ${student['number']}: ${student['name']}'),
+                          leading:
+                              const Icon(Icons.person_off, color: Colors.red),
+                          title: Text(
+                              'เลขที่ ${student['number']}: ${student['name']}'),
                         );
                       },
                     ),
@@ -394,6 +235,7 @@ class AttendanceSummaryScreen extends StatelessWidget {
     );
   }
 }
+
 class AttendanceTableScreen extends StatefulWidget {
   const AttendanceTableScreen({super.key});
 
@@ -406,6 +248,12 @@ class _AttendanceTableScreenState extends State<AttendanceTableScreen> {
   @override
   Widget build(BuildContext context) {
     Box attendanceBox = Hive.box('attendanceBox');
+    if (attendanceBox.isEmpty) { // ตรวจสอบว่ากล่องข้อมูลว่างหรือไม่
+    return Scaffold(
+        appBar: AppBar(title: const Text('ตารางเช็คชื่อ')),
+        body: const Center(child: Text('ไม่มีข้อมูลตารางเช็คชื่อ')), // เพิ่มข้อความแจ้งเตือน
+      );
+    }
     List<String> dates = attendanceBox.keys.cast<String>().toList();
     List<Student> students = studentList;
 
@@ -422,7 +270,8 @@ class _AttendanceTableScreenState extends State<AttendanceTableScreen> {
             child: DataTable(
               columns: [
                 const DataColumn(label: Text('ชื่อ/เลขที่')),
-                ...dates.map((date) => DataColumn(label: Text(_formatDate(date)))),
+                ...dates
+                    .map((date) => DataColumn(label: Text(_formatDate(date)))),
               ],
               rows: students.map((student) {
                 return DataRow(
@@ -430,21 +279,29 @@ class _AttendanceTableScreenState extends State<AttendanceTableScreen> {
                     DataCell(Text('${student.number}. ${student.name}')),
                     ...dates.map((date) {
                       Map<String, dynamic> attendance =
-                          Map<String, dynamic>.from(attendanceBox.get(date, defaultValue: {}));
-                      String status = attendance[student.number.toString()]?['status'] ?? 'ขาดเรียน';
+                          Map<String, dynamic>.from(
+                              attendanceBox.get(date, defaultValue: {}));
+                      String status = attendance[student.number.toString()]
+                              ?['status'] ??
+                          'ขาดเรียน';
 
                       return DataCell(
                         GestureDetector(
                           onTap: () {
                             setState(() {
-                              String newStatus = (status == 'มาเรียน') ? 'ขาดเรียน' : 'มาเรียน';
-                              attendance[student.number.toString()]?['status'] = newStatus;
+                              String newStatus = (status == 'มาเรียน')
+                                  ? 'ขาดเรียน'
+                                  : 'มาเรียน';
+                              attendance[student.number.toString()]?['status'] =
+                                  newStatus;
                               attendanceBox.put(date, attendance);
                             });
                           },
                           child: Container(
                             padding: const EdgeInsets.all(8.0),
-                            color: (status == 'มาเรียน') ? Colors.green : Colors.red,
+                            color: (status == 'มาเรียน')
+                                ? Colors.green
+                                : Colors.red,
                             child: Center(
                               child: Text(
                                 status == 'มาเรียน' ? '✔' : '✖',
