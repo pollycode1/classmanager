@@ -1,9 +1,11 @@
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:device_preview/device_preview.dart';
-import 'package:intl/intl.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+// ignore: depend_on_referenced_packages
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:intl/intl.dart';
+import 'screens/attendance_screen.dart';
 import 'student_list.dart';
 
 void main() async {
@@ -25,217 +27,26 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      locale: DevicePreview.locale(context), // รองรับ locale preview
-      builder: DevicePreview.appBuilder, // รองรับ preview builder
-      home: const AttendanceScreen(),
-    );
-  }
-}
-
-class AttendanceScreen extends StatefulWidget {
-  const AttendanceScreen({super.key});
-
-  @override
-  // ignore: library_private_types_in_public_api
-  _AttendanceScreenState createState() => _AttendanceScreenState();
-}
-
-class _AttendanceScreenState extends State<AttendanceScreen> {
-  late Box attendanceBox;
-  final String currentDate = DateTime.now().toIso8601String().split('T')[0];
-  List<Student> students = studentList;
-
-    void updateSummaryBox() {
-    Box summaryBox = Hive.box('summaryBox');
-    Map<String, dynamic> attendance = Map<String, dynamic>.from(attendanceBox.get(currentDate, defaultValue: {}));
-
-    int malePresentCount = 0;
-    int femalePresentCount = 0;
-
-    attendance.forEach((key, value) {
-      if (value['status'] == 'มาเรียน') {
-        if (value['gender'] == 'ชาย') {
-          malePresentCount++;
-        } else if (value['gender'] == 'หญิง') {
-          femalePresentCount++;
-        }
-      }
-    });
-
-    summaryBox.put(
-      currentDate,
-      {
-        'malePresent': malePresentCount,
-        'femalePresent': femalePresentCount,
-        'totalPresent': malePresentCount + femalePresentCount,
-      },
-    );
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    attendanceBox = Hive.box('attendanceBox');
-
-    Map<String, dynamic>? existingAttendance = attendanceBox.get(currentDate);
-    if (existingAttendance == null || existingAttendance.keys.length != students.length) {
-      // สร้างข้อมูลเริ่มต้นหรือรีเซ็ตข้อมูลให้ตรงกับนักเรียนทั้งหมด
-      Map<String, Map<String, String>> initialData = {
-        for (var student in students)
-          student.number.toString(): {
-            'name': student.name,
-            'gender': student.gender,
-            'status': 'ขาดเรียน', // ค่าเริ่มต้นเป็น "ขาดเรียน"
-          },
-      };
-      attendanceBox.put(currentDate, initialData);
-    }
-  }
-
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder(
-      valueListenable: attendanceBox.listenable(),
-      builder: (context, Box box, _) {
-        Map<String, dynamic> attendance = Map.from(
-          box.get(currentDate, defaultValue: {
-            for (var student in students)
-              student.number.toString(): {
-                'name': student.name,
-                'gender': student.gender,
-                'status': 'ขาดเรียน', // ค่าเริ่มต้น
-              },
-          }),
-        );
-
-        return Scaffold(
-          appBar: AppBar(
-            title: Text('เช็คชื่อ ($currentDate)'),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.history),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AttendanceHistoryScreen(students: []),
-                    ),
-                  );
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.table_chart),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AttendanceTableScreen(),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-          body: GridView.builder(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 5),
-            itemCount: students.length,
-            itemBuilder: (context, index) {
-              Student student = students[index];
-              String studentStatus = attendance[student.number.toString()]['status'];
-
-              return GestureDetector(
-                onTap: () {
-                  attendance[student.number.toString()]['status'] =
-                      studentStatus == 'มาเรียน' ? 'ขาดเรียน' : 'มาเรียน';
-                  attendanceBox.put(currentDate, attendance);
-                  updateSummaryBox(); // อัปเดตข้อมูลใน summaryBox
-                },
-                child: Container(
-                  margin: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: studentStatus == 'มาเรียน' ? Colors.green : Colors.red,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: Text(
-                      '${student.number}',
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
-}
-
-class AttendanceHistoryScreen extends StatelessWidget {
-  final List<Student> students;
-  const AttendanceHistoryScreen({super.key, required this.students});
-
-  @override
-  Widget build(BuildContext context) {
-    Box attendanceBox = Hive.box('attendanceBox');
-    for (var key in attendanceBox.keys) {
-      if (kDebugMode) {
-        print('Key: $key, Value: ${attendanceBox.get(key)}');
-      }
-    }
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('ประวัติการขาดเรียน')),
-      body: ListView(
-        children: attendanceBox.keys.map((key) {
-          Map<String, dynamic> attendance = Map<String, dynamic>.from(attendanceBox.get(key, defaultValue: {}));
-
-          // แยกนักเรียนชายและหญิงที่ขาดเรียน
-          int maleAbsentCount = 0;
-          int femaleAbsentCount = 0;
-          attendance.forEach((key, value) {
-            if (value['status'] == 'ขาดเรียน') {
-              if (value['gender'] == 'ชาย') {
-                maleAbsentCount++;
-              } else if (value['gender'] == 'หญิง') {
-                femaleAbsentCount++;
-              }
-            }
-          });
-
-          // แปลงวันที่ให้อยู่ในรูปแบบ วัน d/MM/yyyy
-          String formattedDate = '';
-          try {
-            final parsedDate = DateTime.parse(key); // แปลง key เป็น DateTime
-            formattedDate = DateFormat('EEEE d/MM/yyyy', 'th').format(parsedDate); // ปรับรูปแบบวันที่เป็นภาษาไทย
-          } catch (e) {
-            formattedDate = key; // ใช้ key เดิมถ้าเกิดปัญหา
-          }
-
-          return ListTile(
-            title: Text(formattedDate), // ใช้วันที่ที่ฟอร์แมตแล้ว
-            subtitle: Text(
-              'ขาดเรียน: ${maleAbsentCount + femaleAbsentCount} คน (ชายขาด: $maleAbsentCount คน, หญิงขาด: $femaleAbsentCount คน)',
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AttendanceSummaryScreen(
-                    date: key, summaryText: '',
-                  ),
-                ),
-              );
-            },
-          );
-        }).toList(),
+    return const MaterialApp(
+      localizationsDelegates: [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: [
+        Locale('th', 'TH'), // เพิ่มภาษาไทย
+        Locale('en', 'US'), // ภาษาอังกฤษ (ตัวอย่าง)
+      ],
+      locale: Locale('th', 'TH'), // กำหนดค่าเริ่มต้นเป็นภาษาไทย
+      home: AttendanceScreen(
+        date: '2025-01-01', // ตัวอย่าง
+        summaryText: 'สรุปผลการเข้าชั้นเรียน',
       ),
     );
   }
 }
+
+
 
 // ignore: must_be_immutable
 class AttendanceDetailScreen extends StatelessWidget {
