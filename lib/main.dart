@@ -474,6 +474,20 @@ class AttendanceSummaryScreen extends StatelessWidget {
     Map<String, dynamic> summary = Map<String, dynamic>.from(
         summaryBox.get(date, defaultValue: {}));
 
+    int totalStudents = 41; // Example total number of students
+    int maleTotal = 20; // Example total number of male students
+    int femaleTotal = 21; // Example total number of female students
+
+    int malePresent = summary['malePresent'] is int
+        ? summary['malePresent']
+        : int.tryParse(summary['malePresent'] ?? '0') ?? 0;
+    int femalePresent = summary['femalePresent'] is int
+        ? summary['femalePresent']
+        : int.tryParse(summary['femalePresent'] ?? '0') ?? 0;
+
+    int totalPresent = malePresent + femalePresent;
+    double attendancePercentage = (totalPresent / totalStudents) * 100;
+
     return Scaffold(
       appBar: AppBar(title: Text('สรุปผลการเข้าชั้นเรียนวันที่ $date')),
       body: Padding(
@@ -486,9 +500,12 @@ class AttendanceSummaryScreen extends StatelessWidget {
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 16),
-            Text('มาเรียน (ชาย): ${summary['malePresent'] ?? '0'} คน'),
-            Text('มาเรียน (หญิง): ${summary['femalePresent'] ?? '0'} คน'),
-            Text('มาเรียนทั้งหมด: ${summary['totalPresent'] ?? '0'} คน'),
+            Text('ป.6/3 = $totalStudents คน'),
+            Text('ช = $maleTotal มา $malePresent ขาด ${maleTotal - malePresent}'),
+            Text('ญ = $femaleTotal มา $femalePresent ขาด ${femaleTotal - femalePresent}'),
+            Text('รวมทั้งหมด $totalStudents'),
+            Text('รวมมา $totalPresent'),
+            Text('ร้อยละ ${attendancePercentage.toStringAsFixed(2)}'),
           ],
         ),
       ),
