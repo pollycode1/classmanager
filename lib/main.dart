@@ -1,10 +1,12 @@
 import 'package:device_preview/device_preview.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 // ignore: depend_on_referenced_packages
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
+import 'screens/attendance_screen.dart';
 import 'student_list.dart';
 import 'package:flutter/services.dart'; // Add this import
 import 'hive_log_screen.dart'; // Add this import
@@ -228,8 +230,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   late Box attendanceBox;
   late DateTime selectedDate;
   List<Student> students = studentList;
-  bool isLocked = true; // Initial state is locked
-  final TextEditingController _customKeyController = TextEditingController();
 
   @override
   void initState() {
@@ -239,24 +239,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     _initializeAttendance();
   }
 
-  @override
-  void dispose() {
-    _customKeyController.dispose();
-    super.dispose();
-  }
-
-  void _createCustomKey() {
-    String customKey = _customKeyController.text.trim();
-    if (customKey.isNotEmpty) {
-      setState(() {
-        selectedDate = DateTime.now(); // Reset to current date
-        _initializeAttendance(customKey: customKey);
-      });
-    }
-  }
-
-  void _initializeAttendance({String? customKey}) {
-    String dateKey = customKey ?? selectedDate.toIso8601String().split('T')[0];
+  void _initializeAttendance() {
+    String dateKey = selectedDate.toIso8601String().split('T')[0];
     // ดึงข้อมูลจาก Hive และแปลงเป็น Map<String, dynamic>
     final rawAttendance = attendanceBox.get(dateKey);
 
@@ -353,7 +337,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(dateKey),
+            title: Text('เช็คชื่อ ($dateKey)'),
             actions: [
               IconButton(
                 icon: const Icon(Icons.calendar_today),
@@ -385,99 +369,38 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               ),
             ],
           ),
-          body: Stack(
-            children: [
-              GridView.builder(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 5),
-                itemCount: students.length,
-                itemBuilder: (context, index) {
-                  Student student = students[index];
-                  String studentStatus =
-                      attendance[student.number.toString()]['status'];
+          body: GridView.builder(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 5),
+            itemCount: students.length,
+            itemBuilder: (context, index) {
+              Student student = students[index];
+              String studentStatus =
+                  attendance[student.number.toString()]['status'];
 
-                  return GestureDetector(
-                    onTap: isLocked
-                        ? null
-                        : () {
-                            attendance[student.number.toString()]['status'] =
-                                studentStatus == 'มาเรียน'
-                                    ? 'ขาดเรียน'
-                                    : 'มาเรียน';
-                            attendanceBox.put(dateKey, attendance);
-                            updateSummaryBox(); // อัปเดตข้อมูลใน summaryBox
-                          },
-                    child: Container(
-                      margin: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: studentStatus == 'มาเรียน'
-                            ? Colors.green
-                            : Colors.red,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '${student.number}',
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 16),
-                        ),
-                      ),
-                    ),
-                  );
+              return GestureDetector(
+                onTap: () {
+                  attendance[student.number.toString()]['status'] =
+                      studentStatus == 'มาเรียน' ? 'ขาดเรียน' : 'มาเรียน';
+                  attendanceBox.put(dateKey, attendance);
+                  updateSummaryBox(); // อัปเดตข้อมูลใน summaryBox
                 },
-              ),
-              Positioned(
-                bottom: 16,
-                right: 16,
-                child: FloatingActionButton(
-                  heroTag: 'lockButton',
-                  onPressed: () {
-                    setState(() {
-                      isLocked = !isLocked;
-                    });
-                  },
-                  child: Icon(isLocked ? Icons.lock : Icons.lock_open),
+                child: Container(
+                  margin: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color:
+                        studentStatus == 'มาเรียน' ? Colors.green : Colors.red,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${student.number}',
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ),
                 ),
-              ),
-              Positioned(
-                bottom: 80,
-                right: 16,
-                child: FloatingActionButton(
-                  heroTag: 'addButton',
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) {
-                        return AlertDialog(
-                          title: const Text('สร้างคีย์ที่เป็นข้อความ'),
-                          content: TextField(
-                            controller: _customKeyController,
-                            decoration:
-                                const InputDecoration(hintText: 'ใส่คีย์ที่ต้องการ'),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () {
-                                Navigator.of(context).pop();
-                              },
-                              child: const Text('ยกเลิก'),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                _createCustomKey();
-                                Navigator.of(context).pop();
-                              },
-                              child: const Text('สร้าง'),
-                            ),
-                          ],
-                        );
-                      },
-                    );
-                  },
-                  child: const Icon(Icons.add),
-                ),
-              ),
-            ],
+              );
+            },
           ),
         );
       },
@@ -533,8 +456,7 @@ class AttendanceHistoryScreen extends StatelessWidget {
           // แปลงวันที่ให้อยู่ในรูปแบบ วัน d/MM/yyyy
           String formattedDate = '';
           try {
-            formattedDate =
-                DateFormat('EEEE d/MM/yyyy', 'th').format(DateTime.parse(key));
+            formattedDate = DateFormat('EEEE d/MM/yyyy', 'th').format(DateTime.parse(key));
           } catch (e) {
             formattedDate = key; // ใช้ key เดิมถ้าเกิดปัญหา
           }
@@ -649,6 +571,147 @@ class AttendanceDetailScreen extends StatelessWidget {
   }
 }
 
+class AttendanceSummaryScreen extends StatelessWidget {
+  final String date;
+  final String summaryText;
+
+  const AttendanceSummaryScreen(
+      {super.key, required this.date, required this.summaryText});
+
+  @override
+  Widget build(BuildContext context) {
+    Hive.box('attendanceBox');
+    Box summaryBox = Hive.box('summaryBox');
+
+    if (summaryBox.isEmpty) {
+      // ตรวจสอบว่ากล่องข้อมูลว่างหรือไม่
+      return Scaffold(
+        appBar: AppBar(title: const Text('สรุปการเช็คชื่อ')),
+        body: const Center(
+            child: Text('ไม่มีข้อมูลสรุปการเช็คชื่อ')), // เพิ่มข้อความแจ้งเตือน
+      );
+    }
+    Map<String, dynamic> attendance = Map<String, dynamic>.from(
+      summaryBox.get(date, defaultValue: {'malePresent': 0, 'femalePresent': 0, 'totalPresent': 0}), // ใช้ค่าเริ่มต้น
+    );
+
+    // แยกข้อมูลนักเรียนชายและหญิง
+    int maleCount = 0, femaleCount = 0;
+    int malePresent = 0, maleAbsent = 0;
+    int femalePresent = 0, femaleAbsent = 0;
+
+    // สร้างลิสต์สำหรับเก็บเลขที่และชื่อของนักเรียนที่ขาดเรียน
+    List<Map<String, dynamic>> absentStudents = [];
+
+    attendance.forEach((key, value) {
+      if (value['gender'] == 'ชาย') {
+        maleCount++;
+        if (value['status'] == 'มาเรียน') {
+          malePresent++;
+        } else {
+          maleAbsent++;
+        }
+      } else if (value['gender'] == 'หญิง') {
+        femaleCount++;
+        if (value['status'] == 'มาเรียน') {
+          femalePresent++;
+        } else {
+          femaleAbsent++;
+        }
+      }
+
+      // เพิ่มข้อมูลเลขที่และชื่อของผู้ขาดเรียนเข้าไปในลิสต์
+      if (value['status'] == 'ขาดเรียน') {
+        absentStudents.add({'number': key, 'name': value['name']});
+      }
+    });
+
+    // คำนวณจำนวนรวมและเปอร์เซ็นต์
+    int totalStudents = maleCount + femaleCount;
+    int totalPresent = malePresent + femalePresent;
+    double attendanceRate = totalPresent / totalStudents * 100;
+
+    // แปลงวันที่
+    String formattedDate =
+        DateFormat('EEEE d/MM/yyyy', 'th').format(DateTime.parse(date));
+
+    // สร้างข้อความสรุป
+    String summary =
+        'ป.6/3 = $totalStudents คน\nชาย = $maleCount คน มา $malePresent คน ขาด $maleAbsent คน \nหญิง = $femaleCount คน มา $femalePresent คน ขาด $femaleAbsent คน \nรวมทั้งหมด: $totalStudents คน \nรวมมา: $totalPresent คน\nร้อยละ: ${attendanceRate.toStringAsFixed(2)}%';
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(' $formattedDate'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Divider(),
+            Text(summary, style: const TextStyle(fontSize: 16)),
+            const Divider(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('ข้อความสรุป:', style: TextStyle(fontSize: 16)),
+                IconButton(
+                  icon: const Icon(Icons.copy),
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: summary)).then((_) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('คัดลอกข้อความแล้ว')),
+                      );
+                    });
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AttendanceDetailScreen(
+                        date: date, students: studentList),
+                  ),
+                );
+              },
+              child: const Text('ดูรายละเอียดการเข้าชั้นเรียน'),
+            ),
+            const SizedBox(height: 16),
+            // แสดงรายชื่อนักเรียนที่ขาดเรียนพร้อมเลขที่
+            const Text(
+              'รายชื่อนักเรียนที่ขาดเรียน:',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            absentStudents.isNotEmpty
+                ? Expanded(
+                    child: ListView.builder(
+                      itemCount: absentStudents.length,
+                      itemBuilder: (context, index) {
+                        final student = absentStudents[index];
+                        return ListTile(
+                          leading:
+                              const Icon(Icons.person_off, color: Colors.red),
+                          title: Text(
+                              'เลขที่ ${student['number']}: ${student['name']}'),
+                        );
+                      },
+                    ),
+                  )
+                : const Text(
+                    'ไม่มีนักเรียนขาดเรียน',
+                    style: TextStyle(fontSize: 16, color: Colors.green),
+                  ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class AttendanceTableScreen extends StatefulWidget {
   const AttendanceTableScreen({super.key});
 
@@ -664,9 +727,11 @@ class _AttendanceTableScreenState extends State<AttendanceTableScreen> {
   Widget build(BuildContext context) {
     Box attendanceBox = Hive.box('attendanceBox');
     if (attendanceBox.isEmpty) {
+      // ตรวจสอบว่ากล่องข้อมูลว่างหรือไม่
       return Scaffold(
         appBar: AppBar(title: const Text('ตารางเช็คชื่อ')),
-        body: const Center(child: Text('ไม่มีข้อมูลตารางเช็คชื่อ')),
+        body: const Center(
+            child: Text('ไม่มีข้อมูลตารางเช็คชื่อ')), // เพิ่มข้อความแจ้งเตือน
       );
     }
     List<String> dates = attendanceBox.keys.cast<String>().toList();
@@ -779,60 +844,11 @@ class AttendanceSummaryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Box summaryBox = Hive.box('summaryBox');
-    Box attendanceBox = Hive.box('attendanceBox');
-    Map<String, dynamic> summary =
-        Map<String, dynamic>.from(summaryBox.get(date, defaultValue: {}));
-    Map<String, dynamic> attendance =
-        Map<String, dynamic>.from(attendanceBox.get(date, defaultValue: {}));
-
-    int totalStudents = studentList.length;
-    int maleTotal =
-        studentList.where((student) => student.gender == 'ชาย').length;
-    int femaleTotal =
-        studentList.where((student) => student.gender == 'หญิง').length;
-
-    int malePresent = summary['malePresent'] is int
-        ? summary['malePresent']
-        : int.tryParse(summary['malePresent'] ?? '0') ?? 0;
-    int femalePresent = summary['femalePresent'] is int
-        ? summary['femalePresent']
-        : int.tryParse(summary['femalePresent'] ?? '0') ?? 0;
-
-    int totalPresent = malePresent + femalePresent;
-    double attendancePercentage = (totalPresent / totalStudents) * 100;
-
-    String summaryText = '''
-ป.6/3 = $totalStudents คน
-ช = $maleTotal มา $malePresent ขาด ${maleTotal - malePresent}
-ญ = $femaleTotal มา $femalePresent ขาด ${femaleTotal - femalePresent}
-รวมทั้งหมด $totalStudents
-รวมมา $totalPresent
-ร้อยละ ${attendancePercentage.toStringAsFixed(2)}
-''';
-
-
-    List<Student> femaleAbsentStudents = studentList
-        .where((student) =>
-            student.gender == 'หญิง' &&
-            attendance[student.number.toString()]?['status'] == 'ขาดเรียน')
-        .toList()
-      ..sort((a, b) => a.number.compareTo(b.number));
+    Map<String, dynamic> summary = Map<String, dynamic>.from(
+        summaryBox.get(date, defaultValue: {}));
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('สรุปผลการเข้าชั้นเรียนวันที่ $date'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.copy),
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: summaryText));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('คัดลอกข้อความเรียบร้อย')),
-              );
-            },
-          ),
-        ],
-      ),
+      appBar: AppBar(title: Text('สรุปผลการเข้าชั้นเรียนวันที่ $date')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -843,561 +859,12 @@ class AttendanceSummaryScreen extends StatelessWidget {
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 16),
-            Text('ป.6/3 = $totalStudents คน'),
-            Text(
-                'ช = $maleTotal มา $malePresent ขาด ${maleTotal - malePresent}'),
-            Text(
-                'ญ = $femaleTotal มา $femalePresent ขาด ${femaleTotal - femalePresent}'),
-            Text('รวมทั้งหมด $totalStudents'),
-            Text('รวมมา $totalPresent'),
-            Text('ร้อยละ ${attendancePercentage.toStringAsFixed(2)}'),
-            const SizedBox(height: 16),
-            const Text('หญิง:'),
-            ...femaleAbsentStudents
-                .map((student) => Text('${student.number}. ${student.name}')),
+            Text('มาเรียน (ชาย): ${summary['malePresent'] ?? '0'} คน'),
+            Text('มาเรียน (หญิง): ${summary['femalePresent'] ?? '0'} คน'),
+            Text('มาเรียนทั้งหมด: ${summary['totalPresent'] ?? '0'} คน'),
           ],
         ),
       ),
     );
-  }
-}
-
-class CustomListScreen extends StatefulWidget {
-  const CustomListScreen({super.key});
-
-  @override
-  // ignore: library_private_types_in_public_api
-  _CustomListScreenState createState() => _CustomListScreenState();
-}
-
-class _CustomListScreenState extends State<CustomListScreen> {
-  final TextEditingController _listNameController = TextEditingController();
-
-  @override
-  void dispose() {
-    _listNameController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('สร้างรายการเช็คชื่อ'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            TextField(
-              controller: _listNameController,
-              decoration: const InputDecoration(
-                labelText: 'ชื่อรายการ',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                if (_listNameController.text.isNotEmpty) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => CustomAttendanceScreen(
-                        listName: _listNameController.text,
-                      ),
-                    ),
-                  );
-                }
-              },
-              child: const Text('สร้างรายการ'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class CustomAttendanceScreen extends StatefulWidget {
-  final String listName;
-
-  const CustomAttendanceScreen({super.key, required this.listName});
-
-  @override
-  // ignore: library_private_types_in_public_api
-  _CustomAttendanceScreenState createState() => _CustomAttendanceScreenState();
-}
-
-class _CustomAttendanceScreenState extends State<CustomAttendanceScreen> {
-  late Box customAttendanceBox;
-  late DateTime selectedDate;
-  List<Student> students = studentList;
-  bool isLocked = true; // Initial state is locked
-
-  @override
-  void initState() {
-    super.initState();
-    customAttendanceBox = Hive.box('customAttendanceBox');
-    selectedDate = DateTime.now(); // Default to current date
-    _initializeAttendance();
-  }
-
-  void _initializeAttendance() {
-    String dateKey = selectedDate.toIso8601String().split('T')[0];
-    final rawAttendance =
-        customAttendanceBox.get('${widget.listName}_$dateKey');
-
-    Map<String, dynamic>? existingAttendance;
-    if (rawAttendance is Map) {
-      existingAttendance = Map<String, dynamic>.from(rawAttendance);
-    } else {
-      existingAttendance = null;
-    }
-
-    if (existingAttendance == null ||
-        existingAttendance.keys.length != students.length) {
-      if (kDebugMode) {
-        print("Attendance data is missing or incomplete.");
-      }
-    }
-  }
-
-  Future<void> _selectDate(BuildContext context) async {
-    DateTime? pickedDate = await showDatePicker(
-      context: context,
-      initialDate: selectedDate,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-    );
-
-    if (pickedDate != null && pickedDate != selectedDate) {
-      setState(() {
-        selectedDate = pickedDate;
-        _initializeAttendance(); // Update data for the new date
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    String dateKey = selectedDate.toIso8601String().split('T')[0];
-
-    return ValueListenableBuilder(
-      valueListenable: customAttendanceBox.listenable(),
-      // ignore: avoid_types_as_parameter_names
-      builder: (context, Box box, _) {
-        if (box.isEmpty) {
-          return Scaffold(
-            appBar: AppBar(title: Text(widget.listName)),
-            body: const Center(child: Text('ไม่มีข้อมูลเช็คชื่อ')),
-          );
-        }
-        Map<String, dynamic> attendance = Map.from(
-          box.get('${widget.listName}_$dateKey', defaultValue: {
-            for (var student in students)
-              student.number.toString(): {
-                'name': student.name,
-                'gender': student.gender,
-                'status': 'ขาดเรียน',
-              },
-          }),
-        );
-
-        return Scaffold(
-          appBar: AppBar(
-            title: Text('${widget.listName} ($dateKey)'),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.calendar_today),
-                onPressed: () => _selectDate(context),
-              ),
-              IconButton(
-                icon: const Icon(Icons.history),
-                tooltip: 'ดูประวัติการขาดเรียน',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => CustomAttendanceHistoryScreen(
-                          listName: widget.listName),
-                    ),
-                  );
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.table_chart),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => CustomAttendanceTableScreen(
-                          listName: widget.listName),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-          body: Stack(
-            children: [
-              GridView.builder(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 5),
-                itemCount: students.length,
-                itemBuilder: (context, index) {
-                  Student student = students[index];
-                  String studentStatus =
-                      attendance[student.number.toString()]['status'];
-
-                  return GestureDetector(
-                    onTap: isLocked
-                        ? null
-                        : () {
-                            attendance[student.number.toString()]['status'] =
-                                studentStatus == 'มาเรียน'
-                                    ? 'ขาดเรียน'
-                                    : 'มาเรียน';
-                            customAttendanceBox.put(
-                                '${widget.listName}_$dateKey', attendance);
-                          },
-                    child: Container(
-                      margin: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: studentStatus == 'มาเรียน'
-                            ? Colors.green
-                            : Colors.red,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '${student.number}',
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 16),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              Positioned(
-                bottom: 16,
-                right: 16,
-                child: FloatingActionButton(
-                  heroTag: 'lockButton',
-                  onPressed: () {
-                    setState(() {
-                      isLocked = !isLocked;
-                    });
-                  },
-                  child: Icon(isLocked ? Icons.lock : Icons.lock_open),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class CustomAttendanceHistoryScreen extends StatelessWidget {
-  final String listName;
-
-  const CustomAttendanceHistoryScreen({super.key, required this.listName});
-
-  @override
-  Widget build(BuildContext context) {
-    Box customAttendanceBox = Hive.box('customAttendanceBox');
-    if (customAttendanceBox.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('ประวัติการขาดเรียน')),
-        body: const Center(child: Text('ไม่มีข้อมูลประวัติการขาดเรียน')),
-      );
-    }
-    for (var key in customAttendanceBox.keys) {
-      if (kDebugMode) {
-        print('Key: $key, Value: ${customAttendanceBox.get(key)}');
-      }
-    }
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('ประวัติการขาดเรียน')),
-      body: ListView(
-        children: customAttendanceBox.keys
-            .where((key) => key.toString().startsWith(listName))
-            .map((key) {
-          Map<String, dynamic> attendance = Map<String, dynamic>.from(
-              customAttendanceBox.get(key, defaultValue: {}));
-
-          int maleAbsentCount = 0;
-          int femaleAbsentCount = 0;
-          attendance.forEach((key, value) {
-            if (value['status'] == 'ขาดเรียน') {
-              if (value['gender'] == 'ชาย') {
-                maleAbsentCount++;
-              } else if (value['gender'] == 'หญิง') {
-                femaleAbsentCount++;
-              }
-            }
-          });
-
-          String formattedDate = '';
-          try {
-            formattedDate = DateFormat('EEEE d/MM/yyyy', 'th')
-                .format(DateTime.parse(key.toString().split('_').last));
-          } catch (e) {
-            formattedDate = key.toString().split('_').last;
-          }
-
-          return ListTile(
-            title: Text(formattedDate),
-            subtitle: Text(
-              'ขาดเรียน: ${maleAbsentCount + femaleAbsentCount} คน (ชายขาด: $maleAbsentCount คน, หญิงขาด: $femaleAbsentCount คน)',
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => CustomAttendanceSummaryScreen(
-                    listName: listName,
-                    date: key.toString().split('_').last,
-                  ),
-                ),
-              );
-            },
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
-class CustomAttendanceSummaryScreen extends StatelessWidget {
-  final String listName;
-  final String date;
-
-  const CustomAttendanceSummaryScreen({
-    super.key,
-    required this.listName,
-    required this.date,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Box customAttendanceBox = Hive.box('customAttendanceBox');
-    Map<String, dynamic> attendance = Map<String, dynamic>.from(
-        customAttendanceBox.get('${listName}_$date', defaultValue: {}));
-
-    int totalStudents = studentList.length;
-    int maleTotal =
-        studentList.where((student) => student.gender == 'ชาย').length;
-    int femaleTotal =
-        studentList.where((student) => student.gender == 'หญิง').length;
-
-    int malePresent = attendance.values
-        .where(
-            (value) => value['status'] == 'มาเรียน' && value['gender'] == 'ชาย')
-        .length;
-    int femalePresent = attendance.values
-        .where((value) =>
-            value['status'] == 'มาเรียน' && value['gender'] == 'หญิง')
-        .length;
-
-    int totalPresent = malePresent + femalePresent;
-    double attendancePercentage = (totalPresent / totalStudents) * 100;
-
-    String summaryText = '''
-$listName = $totalStudents คน
-ช = $maleTotal มา $malePresent ขาด ${maleTotal - malePresent}
-ญ = $femaleTotal มา $femalePresent ขาด ${femaleTotal - femalePresent}
-รวมทั้งหมด $totalStudents
-รวมมา $totalPresent
-ร้อยละ ${attendancePercentage.toStringAsFixed(2)}
-''';
-
-    List<Student> maleAbsentStudents = studentList
-        .where((student) =>
-            student.gender == 'ชาย' &&
-            attendance[student.number.toString()]?['status'] == 'ขาดเรียน')
-        .toList()
-      ..sort((a, b) => a.number.compareTo(b.number));
-
-    List<Student> femaleAbsentStudents = studentList
-        .where((student) =>
-            student.gender == 'หญิง' &&
-            attendance[student.number.toString()]?['status'] == 'ขาดเรียน')
-        .toList()
-      ..sort((a, b) => a.number.compareTo(b.number));
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('สรุปผลการเข้าชั้นเรียนวันที่ $date'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.copy),
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: summaryText));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('คัดลอกข้อความเรียบร้อย')),
-              );
-            },
-          ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'สรุปผลการเข้าชั้นเรียน',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 16),
-            Text('$listName = $totalStudents คน'),
-            Text(
-                'ช = $maleTotal มา $malePresent ขาด ${maleTotal - malePresent}'),
-            Text(
-                'ญ = $femaleTotal มา $femalePresent ขาด ${femaleTotal - femalePresent}'),
-            Text('รวมทั้งหมด $totalStudents'),
-            Text('รวมมา $totalPresent'),
-            Text('ร้อยละ ${attendancePercentage.toStringAsFixed(2)}'),
-            const SizedBox(height: 16),
-            const Text('รายชื่อนักเรียนที่ขาดเรียน:'),
-            const SizedBox(height: 8),
-            const Text('ชาย:'),
-            ...maleAbsentStudents
-                .map((student) => Text('${student.number}. ${student.name}')),
-            const SizedBox(height: 8),
-            const Text('หญิง:'),
-            ...femaleAbsentStudents
-                .map((student) => Text('${student.number}. ${student.name}')),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class CustomAttendanceTableScreen extends StatefulWidget {
-  final String listName;
-
-  const CustomAttendanceTableScreen({super.key, required this.listName});
-
-  @override
-  // ignore: library_private_types_in_public_api
-  _CustomAttendanceTableScreenState createState() =>
-      _CustomAttendanceTableScreenState();
-}
-
-class _CustomAttendanceTableScreenState
-    extends State<CustomAttendanceTableScreen> {
-  bool isLocked = true; // Initial state is locked
-
-  @override
-  Widget build(BuildContext context) {
-    Box customAttendanceBox = Hive.box('customAttendanceBox');
-    if (customAttendanceBox.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: Text(widget.listName)),
-        body: const Center(child: Text('ไม่มีข้อมูลตารางเช็คชื่อ')),
-      );
-    }
-    List<String> dates = customAttendanceBox.keys.cast<String>().toList();
-    List<Student> students = studentList;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.listName),
-      ),
-      body: Stack(
-        children: [
-          Scrollbar(
-            thumbVisibility: true,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.vertical,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: DataTable(
-                  columns: [
-                    const DataColumn(label: Text('ชื่อ/เลขที่')),
-                    ...dates.map(
-                        (date) => DataColumn(label: Text(_formatDate(date)))),
-                  ],
-                  rows: students.map((student) {
-                    return DataRow(
-                      cells: [
-                        DataCell(Text('${student.number}. ${student.name}')),
-                        ...dates.map((date) {
-                          Map<String, dynamic> attendance =
-                              Map<String, dynamic>.from(customAttendanceBox
-                                  .get(date, defaultValue: {}));
-                          String status = attendance[student.number.toString()]
-                                  ?['status'] ??
-                              'ขาดเรียน';
-
-                          return DataCell(
-                            GestureDetector(
-                              onTap: isLocked
-                                  ? null
-                                  : () {
-                                      setState(() {
-                                        String newStatus = (status == 'มาเรียน')
-                                            ? 'ขาดเรียน'
-                                            : 'มาเรียน';
-                                        attendance[student.number.toString()]
-                                            ?['status'] = newStatus;
-                                        customAttendanceBox.put(
-                                            date, attendance);
-                                      });
-                                    },
-                              child: Container(
-                                padding: const EdgeInsets.all(8.0),
-                                color: (status == 'มาเรียน')
-                                    ? Colors.green
-                                    : Colors.red,
-                                child: Center(
-                                  child: Text(
-                                    status == 'มาเรียน' ? '✔' : '✖',
-                                    style: const TextStyle(color: Colors.white),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        }),
-                      ],
-                    );
-                  }).toList(),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 16,
-            right: 16,
-            child: FloatingActionButton(
-              heroTag: 'lockButton',
-              onPressed: () {
-                setState(() {
-                  isLocked = !isLocked;
-                });
-              },
-              child: Icon(isLocked ? Icons.lock : Icons.lock_open),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDate(String date) {
-    try {
-      DateTime parsedDate = DateTime.parse(date);
-      return DateFormat('d/MM').format(parsedDate);
-    } catch (e) {
-      return date;
-    }
   }
 }
