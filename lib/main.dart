@@ -8,9 +8,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
 import 'screens/attendance_screen.dart';
 import 'student_list.dart';
-import 'package:flutter/services.dart'; // Add this import
-import 'hive_log_screen.dart'; // Add this import
- 
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // เพิ่มเพื่อให้ async ทำงานถูกต้อง
   await Hive.initFlutter();
@@ -844,11 +842,60 @@ class AttendanceSummaryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Box summaryBox = Hive.box('summaryBox');
+    Box attendanceBox = Hive.box('attendanceBox');
     Map<String, dynamic> summary = Map<String, dynamic>.from(
         summaryBox.get(date, defaultValue: {}));
+    Map<String, dynamic> attendance = Map<String, dynamic>.from(
+        attendanceBox.get(date, defaultValue: {}));
+
+    int totalStudents = studentList.length;
+    int maleTotal = studentList.where((student) => student.gender == 'ชาย').length;
+    int femaleTotal = studentList.where((student) => student.gender == 'หญิง').length;
+
+    int malePresent = summary['malePresent'] is int
+        ? summary['malePresent']
+        : int.tryParse(summary['malePresent'] ?? '0') ?? 0;
+    int femalePresent = summary['femalePresent'] is int
+        ? summary['femalePresent']
+        : int.tryParse(summary['femalePresent'] ?? '0') ?? 0;
+
+    int totalPresent = malePresent + femalePresent;
+    double attendancePercentage = (totalPresent / totalStudents) * 100;
+
+    String summaryText = '''
+ป.6/3 = $totalStudents คน
+ช = $maleTotal มา $malePresent ขาด ${maleTotal - malePresent}
+ญ = $femaleTotal มา $femalePresent ขาด ${femaleTotal - femalePresent}
+รวมทั้งหมด $totalStudents
+รวมมา $totalPresent
+ร้อยละ ${attendancePercentage.toStringAsFixed(2)}
+''';
+
+    List<Student> maleAbsentStudents = studentList
+        .where((student) => student.gender == 'ชาย' && attendance[student.number.toString()]?['status'] == 'ขาดเรียน')
+        .toList()
+      ..sort((a, b) => a.number.compareTo(b.number));
+
+    List<Student> femaleAbsentStudents = studentList
+        .where((student) => student.gender == 'หญิง' && attendance[student.number.toString()]?['status'] == 'ขาดเรียน')
+        .toList()
+      ..sort((a, b) => a.number.compareTo(b.number));
 
     return Scaffold(
-      appBar: AppBar(title: Text('สรุปผลการเข้าชั้นเรียนวันที่ $date')),
+      appBar: AppBar(
+        title: Text('สรุปผลการเข้าชั้นเรียนวันที่ $date'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.copy),
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: summaryText));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('คัดลอกข้อความเรียบร้อย')),
+              );
+            },
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -859,9 +906,20 @@ class AttendanceSummaryScreen extends StatelessWidget {
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 16),
-            Text('มาเรียน (ชาย): ${summary['malePresent'] ?? '0'} คน'),
-            Text('มาเรียน (หญิง): ${summary['femalePresent'] ?? '0'} คน'),
-            Text('มาเรียนทั้งหมด: ${summary['totalPresent'] ?? '0'} คน'),
+            Text('ป.6/3 = $totalStudents คน'),
+            Text('ช = $maleTotal มา $malePresent ขาด ${maleTotal - malePresent}'),
+            Text('ญ = $femaleTotal มา $femalePresent ขาด ${femaleTotal - femalePresent}'),
+            Text('รวมทั้งหมด $totalStudents'),
+            Text('รวมมา $totalPresent'),
+            Text('ร้อยละ ${attendancePercentage.toStringAsFixed(2)}'),
+            const SizedBox(height: 16),
+            const Text('รายชื่อนักเรียนที่ขาดเรียน:'),
+            const SizedBox(height: 8),
+            const Text('ชาย:'),
+            ...maleAbsentStudents.map((student) => Text('${student.number}. ${student.name}')),
+            const SizedBox(height: 8),
+            const Text('หญิง:'),
+            ...femaleAbsentStudents.map((student) => Text('${student.number}. ${student.name}')),
           ],
         ),
       ),
